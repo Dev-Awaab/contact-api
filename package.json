@@ -5,13 +5,23 @@
   "type": "module",
   "scripts": {
     "start": "node server",
-    "dev": "node --watch --env-file=.env server"
+    "dev": "nodemon server",
+    "create-db": "docker run --name contact-api-db -d -p 27017:27017 mongo",
+    "start-db": "docker start contact-api-db",
+    "stop-db": "docker stop contact-api-db"
   },
   "keywords": [],
   "author": "Dev-Awaab",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "express": "^4.21.1"
+    "colors": "^1.4.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "mongoose": "^8.8.0",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
   }
 }

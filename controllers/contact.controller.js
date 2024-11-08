@@ -9,6 +9,9 @@ import ContactModel from "../models/contact.model.js";
 const getContacts = async (req, res) => {
   try {
     const contacts = await ContactModel.find();
+    const user = req.user;
+
+
 
     res.status(200).json({
       success: true,

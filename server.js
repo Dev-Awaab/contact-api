@@ -1,10 +1,12 @@
 import express from "express";
 import ContactsRoutes from "./routes/contacts.route.js";
+import UsersRoutes from "./routes/user.route.js";
 import connectDB from "./config/db.js";
 import dotenv from "dotenv";
 import logger from "./middleware/logger.js";
 import responseTimeLogger from "./middleware/responseTimeLogger.js";
 import morgan from "morgan";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
 
@@ -21,9 +23,11 @@ app.get("/", (req, res) => {
 // Logger Middleware
 app.use(responseTimeLogger);
 app.use(logger);
+app.use(cookieParser());
 app.use(morgan("dev"));
 
 // Routes
+app.use("/api/users", UsersRoutes);
 app.use("/api/contacts", ContactsRoutes);
 
 // Database connection

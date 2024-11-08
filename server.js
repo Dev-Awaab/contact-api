@@ -1,5 +1,6 @@
 import express from "express";
 import ContactsRoutes from "./routes/contacts.route.js";
+import UserRoutes from "./routes/user.route.js"
 import connectDB from "./config/db.js";
 import dotenv from "dotenv";
 import logger from "./middleware/logger.js";
@@ -26,6 +27,7 @@ app.use(morgan("dev"));
 // Routes
 app.use("/api/contacts", ContactsRoutes);
 
+app.use("/api/users", UserRoutes);
 // Database connection
 connectDB();
 

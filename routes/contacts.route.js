@@ -6,10 +6,8 @@ import {
   getContacts,
   updateContact,
 } from "../controllers/contact.controller.js";
-import { AuthMiddleWare } from "../middleware/auth.js";
 const router = express.Router();
 
-router.use(AuthMiddleWare);
 router.get("/", getContacts);
 router.get("/:id", getContact);
 router.post("/", createContact);

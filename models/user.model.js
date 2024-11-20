@@ -2,15 +2,6 @@ import mongoose from "mongoose";
 
 const UserSchema = mongoose.Schema(
   {
-    firstName: {
-      type: String,
-      required: true,
-    },
-
-    lastName: {
-      type: String,
-      required: true,
-    },
     email: {
       type: String,
       required: true,
@@ -20,14 +11,16 @@ const UserSchema = mongoose.Schema(
       type: String,
       required: true,
     },
-    
-    avatar_Url: {
-      type: String,
-    },
+
     role: {
       type: String,
       enum: ["User", "Admin"],
       default: "User",
+    },
+    profile: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "profile",
+      unique: true,
     },
   },
   {

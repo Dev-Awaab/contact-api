@@ -1,5 +1,10 @@
-import User from "../models/user.model.js";
+import UserModel from "../models/user.model.js";
 import { comparePassword, genToken, hash } from "../utils/encrypt.js";
+import ProfileModel from "../models/profile.model.js";
+import {
+  validateUser,
+  validateUserLogin,
+} from "../validation/auth.validation.js";
 
 /**
  * @desc Get all users
@@ -9,7 +14,7 @@ import { comparePassword, genToken, hash } from "../utils/encrypt.js";
 
 const getUsers = async (req, res) => {
   try {
-    const users = await User.find().select("-password");
+    const users = await UserModel.find().select("-password");
 
     res.status(200).json({
       success: true,
@@ -32,7 +37,11 @@ const getUsers = async (req, res) => {
 
 const getUser = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select("-password");
+    const user = await UserModel.findById(req.user._id)
+      .select("-password")
+      .populate("profile");
+    // Also populate but takes in paths and items to select
+    // .populate({ path: "profile", select: "firstName lastName" });
 
     if (!user) {
       return res
@@ -40,10 +49,12 @@ const getUser = async (req, res) => {
         .json({ message: `The user with id of ${id} was not found` });
     }
 
+    const data = formatUser(user);
+
     res.status(200).json({
       success: true,
       message: "User Retrieved successfully",
-      data: user,
+      data,
     });
   } catch (error) {
     res.status(500).json({
@@ -62,14 +73,21 @@ const getUser = async (req, res) => {
 const registerUser = async (req, res) => {
   try {
     const { firstName, lastName, email, password } = req.body;
-    if (!firstName || !lastName || !email || !password) {
+    // if (!firstName || !lastName || !email || !password) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "firstName, lastName, email and password are required",
+    //   });
+    // }
+
+    const { error } = validateUser(req.body);
+    if (error)
       return res.status(400).json({
         success: false,
-        message: "firstName, lastName, email and password are required",
+        message: error.details[0].message,
       });
-    }
 
-    const userExists = await User.findOne({ email });
+    const userExists = await UserModel.findOne({ email });
     if (userExists) {
       res.status(400).json({
         message: "user already exist",
@@ -78,22 +96,27 @@ const registerUser = async (req, res) => {
 
     const hashedPassword = await hash(password);
 
-    const user = await User.create({
-      firstName,
-      lastName,
+    const user = await UserModel.create({
       email,
       password: hashedPassword,
     });
 
+    const profile = await ProfileModel.create({
+      firstName,
+      lastName,
+      user: user._id,
+    });
+
+    user.profile = profile._id;
+
+    await user.save();
+
+    await user.populate("profile");
+
     res.status(201).json({
       success: true,
       message: "User Created Successfully",
-      data: {
-        _id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-      },
+      data: user,
     });
   } catch (error) {
     res.status(500).json({
@@ -111,13 +134,19 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const { error } = validateUserLogin(req.body);
+    if (error)
+      return res.status(400).json({
+        success: false,
+        message: error.details[0].message,
+      });
 
-    const user = await User.findOne({ email });
+    const user = await UserModel.findOne({ email });
 
     if (!user) {
       return res
         .status(404)
-        .json({ message: `The user with id of ${id} was not found` });
+        .json({ message: `The user with email ${email} was not found` });
     }
 
     const isPasswordMatch = await comparePassword(password, user.password);
@@ -126,50 +155,18 @@ const loginUser = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // res.status(200).json({
-    //   success: true,
-    //   message: "User logged in successfully",
-    //   data: {
-    //     _id: user._id,
-    //     firstName: user.firstName,
-    //     lastName: user.lastName,
-    //     email: user.email,
-    //     access_token: genToken({
-    //       id: user._id,
-    //       email: user.email,
-    //       role: user.role,
-    //     }),
-    //   },
-    // });
+    await user.populate("profile");
+
+    const data = formatUser(user);
 
     const token = genToken({
       id: user._id,
       email: user.email,
       role: user.role,
     });
-    const data = {
-      _id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-    };
+    delete user.password;
 
     sendTokenResponse(token, 200, res, data);
-
-    // if (user && (await user.matchPassword(password))) {
-    //   res.status(200).json({
-    //     success: true,
-    //     message: "User logged in successfully",
-    //     data: {
-    //       _id: user._id,
-    //       firstName: user.firstName,
-    //       lastName: user.lastName,
-    //       email: user.email,
-    //     },
-    //   });
-    // } else {
-    //   res.status(401).json({ message: "Invalid email or password" });
-    // }
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -186,22 +183,44 @@ const loginUser = async (req, res) => {
 
 const updateUser = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = req.user;
 
-    await User.findByIdAndUpdate(id, req.body, { new: true });
+    let user = await UserModel.findById(id);
 
-    const updatedUser = await User.findById(id).select("-password");
-
-    if (!updatedUser) {
+    if (!user) {
       return res
         .status(404)
-        .json({ message: `The user with id of ${id} was not found` });
+        .json({ message: `The user with email ${email} was not found` });
     }
+
+    const { role, ...rest } = req.body;
+
+    if (role) {
+      user.role = role;
+      await user.save();
+      return res.status(201).json({
+        success: true,
+        message: "User Updated Successfully",
+        data: formatUser(user),
+      });
+    }
+
+    // const profile = await ProfileModel.findById(user.profile);
+
+    // if (!profile) {
+    //   return res
+    //     .status(404)
+    //     .json({ message: `The profile with id ${profile._id} was not found` });
+    // }
+
+    await ProfileModel.updateOne({ user: user._id }, rest);
+
+    user = await UserModel.findById(user.id).populate("profile");
 
     res.status(201).json({
       success: true,
       message: "User Updated Successfully",
-      data: updatedUser,
+      data: formatUser(user),
     });
   } catch (error) {
     res.status(500).json({
@@ -221,7 +240,7 @@ const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const deletedUser = await User.findByIdAndDelete(id);
+    const deletedUser = await UserModel.findByIdAndDelete(id);
     if (!deletedUser) {
       return res
         .status(404)
@@ -252,5 +271,24 @@ const sendTokenResponse = (token, statusCode, res, data) => {
     access_token: token,
     data,
   });
+};
+
+const formatUser = (user) => {
+  const { profile } = user;
+  return {
+    _id: user._id,
+    email: user.email,
+    role: user.role,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    profile: {
+      _id: profile._id,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      user: profile.user,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+    },
+  };
 };
 export { getUsers, getUser, registerUser, loginUser, updateUser, deleteUser };

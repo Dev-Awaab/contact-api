@@ -18,6 +18,7 @@ const ContactSchema = mongoose.Schema(
       enum: ["personal", "professional"],
       require: true,
     },
+    user: { type: mongoose.Types.ObjectId, ref: "user" },
   },
   {
     timestamps: true,

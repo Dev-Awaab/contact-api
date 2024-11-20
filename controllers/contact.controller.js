@@ -9,9 +9,6 @@ import ContactModel from "../models/contact.model.js";
 const getContacts = async (req, res) => {
   try {
     const contacts = await ContactModel.find();
-    const user = req.user;
-
-
 
     res.status(200).json({
       success: true,
@@ -68,7 +65,10 @@ const createContact = async (req, res) => {
         message: "name or email or type are required",
       });
     }
-    const contact = await ContactModel.create(req.body);
+    const contact = await ContactModel.create({
+      user: req.user.id,
+      ...req.body,
+    });
 
     res.status(201).json({
       success: true,
@@ -125,14 +125,20 @@ const updateContact = async (req, res) => {
  * @Access Public
  */
 
-const deleteContact = async (req, res) => {
+const deleteContacttest = async (req, res) => {
   try {
     const contact = await ContactModel.findById(req.params.id);
 
     if (!contact) {
-      return res
-        .status(404)
-        .json({ message: `The contact with id of ${id} was not found` });
+      return res.status(404).json({
+        message: `The contact with id of ${req.params.id} was not found`,
+      });
+    }
+
+    if (contact.user !== req.user.id.toString()) {
+      return res.status(404).json({
+        message: `You do not have the access to delete this contact `,
+      });
     }
 
     await ContactModel.findByIdAndDelete(req.params.id);
@@ -142,10 +148,44 @@ const deleteContact = async (req, res) => {
       data: {},
     });
   } catch (error) {
+    console.log({ error });
     res.status(500).json({
       success: false,
       message: error.message,
     });
   }
 };
-export { getContacts, getContact, createContact, updateContact, deleteContact };
+
+/**
+ * @desc Get users  contacts
+ * @Route GET /api/contacts/user
+ * @Access Private
+ */
+const getUserContact = async (req, res) => {
+  try {
+    const contacts = await ContactModel.find({ user: req.user.id }).populate(
+      "user",
+      "email role"
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Retrived",
+      data: contacts,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export {
+  getContacts,
+  getContact,
+  createContact,
+  updateContact,
+  deleteContacttest,
+  getUserContact,
+};
